@@ -25,11 +25,6 @@ void initWIFI();
 
 void setup()
 {
-	//debug
-	Serial.begin(115200);
-	while (!Serial)
-		{;}
-
 	lcd.begin(16,2);
 	lcd.setCursor(0,0);
 	lcd.leftToRight();
@@ -38,9 +33,6 @@ void setup()
 	displayIntro();
 	initNames();
 	displayFronter();
-
-	//debug
-	Serial.println("Finished Setup");
 }
 
 void displayIntro()
@@ -58,48 +50,29 @@ void displayIntro()
 
 void initNames()
 {
-	sysName = curlValueByKeyWithUrl("name", APISystemURL);
+	sysName = getValueByKeyWithUrl("name", APISystemURL);
 }
 
 void displayFronter()
 {
-	char* newName = curlValueByKeyWithUrl("name", APIFronterURL);
+	char* newName = getValueByKeyWithUrl("name", APIFronterURL);
 
 	if (strcmp(newName, fronterName) != 0)
 	{
-		//debug
-		Serial.println("1");
 		strcpy(fronterName, newName);
-		//debug
-		Serial.println("3");
-		lcd.clear();
-		//debug
-		Serial.println("4");
-
-		lcd.setCursor(0,0);
-		//debug
-		Serial.println("5");
-		lcd.write(sysName);
-		//debug
-		Serial.println("6");
-
 		int nameLen = strlen(fronterName);
-		//debug
-		Serial.println("7");
+
+		lcd.clear();
+		lcd.setCursor(0,0);
+		lcd.write(sysName);
+
 		lcd.setCursor(15-nameLen, 1);
-		//debug
-		Serial.println("8");
 		lcd.write(fronterName);
-		//debug
-		Serial.println("9");
 	}
 }
 
 void loop()
 {
-	//debug
-	Serial.println("Beginning Loop");
-	
 	delay(60*1000);
 	displayFronter();
 }
@@ -129,7 +102,7 @@ void initWIFI()
 
 char* getValueByKey(const char *json_string, jsmntok_t token_array[], int index, const char* key);
 
-char* curlValueByKeyWithUrl(char* key, char* url)
+char* getValueByKeyWithUrl(char* key, char* url)
 {
 	jsmn_parser parser;
 	int token_count;
@@ -140,72 +113,41 @@ char* curlValueByKeyWithUrl(char* key, char* url)
 	client.setInsecure();
 	client.connect(APIHostname, HTTPSPort);
 	
-	//debug
-	Serial.println("Connection Established");
-
 	if (client.verify(APICertFingerprint, APIHostname))
 	{
-		//debug
-		Serial.print("Sending Request");
-		Serial.println(String("GET ") + url + " HTTP/1.1\r\n" +
-							"Host: " + APIHostname + "\r\n" +               
-							"Connection: close\r\n" +
-							"Cookies: Authorization=" + Token + "\r\n\r\n");
 		client.print(String("GET ") + url + " HTTP/1.1\r\n" +
 							"Host: " + APIHostname + "\r\n" +               
 							"Connection: close\r\n" +
 							"Cookies: Authorization=" + Token + "\r\n\r\n");
 
 
-		Serial.println("HEADERS:");
 		while (client.connected())
 		{
-			response_Str = client.readStringUntil('\n');
+			if (client.readStringUntil("\n") == "\r")
 			{
-				//debug
-				Serial.println(response_Str);
-				if (response_Str == "\r")
-				{
-					//debug
-					Serial.println("Headers Received");
-					break;
-				}
+				break;
 			}
 		}
 
 		while (client.available())
 		{
 			response_Str = client.readString();
-			//debug
-			Serial.println(response_Str);
 		}
 
-	}
-	else
-	{
-		Serial.println("API Cert Fingerprint Not Matching");
 	}
 
 	jsmn_init(&parser);
 	token_count = jsmn_parse(&parser, response_Str.c_str(), strlen(response_Str.c_str()), NULL, 1);
-	
-	//debug
-	Serial.println("Token count: ");
-	Serial.println(token_count);
 
 	jsmn_init(&parser);
 	jsmntok_t token_array[token_count];
 	int parse_response = jsmn_parse(&parser, response_Str.c_str(), strlen(response_Str.c_str()), token_array, token_count);
-
-	Serial.print("Parse Response: ");
-	Serial.println(parse_response);
 
 	if (parse_response > 0)
 	{
 		for (int a = 0; a < token_count; a++)
 		{
 			value = getValueByKey(response_Str.c_str(), token_array, a, key);
-			Serial.println(value);
 			if (value != NULL)
 			{
 				break;
