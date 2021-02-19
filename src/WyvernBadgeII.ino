@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include "system.h"
 
+#define UpdateInterval 30 * 1000
 #define MaxNameLen 16
 #define EllipsisDelayTime 500
 #define OpenScreenWaitTime 3000 - 3 * EllipsisDelayTime
@@ -66,14 +67,14 @@ void displayFronter()
 		lcd.setCursor(0,0);
 		lcd.write(sysName);
 
-		lcd.setCursor(15-nameLen, 1);
+		lcd.setCursor(MaxNameLen-nameLen, 1);
 		lcd.write(fronterName);
 	}
 }
 
 void loop()
 {
-	delay(60*1000);
+	delay(UpdateInterval);
 	displayFronter();
 }
 
@@ -83,16 +84,20 @@ void initWIFI()
 	lcd.write("Connecting");
 	while (WiFi.status() != WL_CONNECTED) 
 	{
-		for (int a = 0; a < 16 - strlen("Connecting"); a++)
+		for (int a = 0; a < MaxNameLen - strlen("Connecting"); a++)
 		{
 			delay(EllipsisDelayTime);
 			lcd.write(".");
+			if (WiFi.status() == WL_CONNECTED)
+				break;
 		}
 		lcd.setCursor(0,1);
-		for (int a = 0; a < 16; a++)
+		for (int a = 0; a < MaxNameLen; a++)
 		{
 			delay(EllipsisDelayTime);
 			lcd.write(".");
+			if (WiFi.status() == WL_CONNECTED)
+				break;
 		}
 	}
 	lcd.setCursor(0,0);
@@ -113,27 +118,23 @@ char* getValueByKeyWithUrl(char* key, char* url)
 	client.setInsecure();
 	client.connect(APIHostname, HTTPSPort);
 	
-	if (client.verify(APICertFingerprint, APIHostname))
+	client.print(String("GET ") + url + " HTTP/1.1\r\n" +
+				"Host: " + APIHostname + "\r\n" +               
+				"Connection: close\r\n" +
+				"Cookies: Authorization=" + Token + "\r\n\r\n");
+
+	while (client.connected())
 	{
-		client.print(String("GET ") + url + " HTTP/1.1\r\n" +
-							"Host: " + APIHostname + "\r\n" +               
-							"Connection: close\r\n" +
-							"Cookies: Authorization=" + Token + "\r\n\r\n");
-
-
-		while (client.connected())
+		response_Str = client.readStringUntil('\n');
+		if (response_Str == "\r")
 		{
-			if (client.readStringUntil("\n") == "\r")
-			{
-				break;
-			}
+			break;
 		}
+	}
 
-		while (client.available())
-		{
-			response_Str = client.readString();
-		}
-
+	while (client.available())
+	{
+		response_Str = client.readString();
 	}
 
 	jsmn_init(&parser);
